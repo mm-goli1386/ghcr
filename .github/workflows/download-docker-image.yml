@@ -1,0 +1,38 @@
+name: Download Docker Image to Repository
+
+on:
+  workflow_dispatch:
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Pull Docker image
+        run: |
+          docker pull ghcr.io/m-logique/fluffychat-building-bundle:44233fc3b0ffa2ab0a5bde6178a7c77597143c49
+      
+      - name: Save as tar file
+        run: |
+          docker save ghcr.io/m-logique/fluffychat-building-bundle:44233fc3b0ffa2ab0a5bde6178a7c77597143c49 -o fluffychat-image.tar
+      
+      - name: Compress
+        run: |
+          gzip fluffychat-image.tar
+      
+      - name: Upload as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fluffychat-image
+          path: fluffychat-image.tar.gz
+      
+      - name: Commit to repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add fluffychat-image.tar.gz
+          git commit -m "Add FluffyChat Docker image" || echo "No changes"
+          git push
