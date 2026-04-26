@@ -1,3 +1,5 @@
+name: Simple Docker Image Upload
+
 on:
   workflow_dispatch:
 
