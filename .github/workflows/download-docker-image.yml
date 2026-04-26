@@ -25,16 +25,10 @@ jobs:
       
       - name: Split into 95MB parts
         run: |
-          # حذف فایل‌های قدیمی اگر وجود دارند
           rm -f fluffychat-part-* || true
-          
-          # تقسیم فایل به پارت‌های 95 مگابایتی (95 * 1024 * 1024 = 99614720 bytes)
           split -b 99614720 fluffychat-image.tar.gz fluffychat-part-
-          
-          # شمارش تعداد پارت‌ها
           PART_COUNT=$(ls fluffychat-part-* | wc -l)
           echo "PART_COUNT=$PART_COUNT" >> $GITHUB_ENV
-          echo "Created $PART_COUNT parts"
       
       - name: Create restore script
         run: |
@@ -46,24 +40,16 @@ jobs:
           gunzip fluffychat-image.tar.gz
           echo "Loading into Docker..."
           docker load -i fluffychat-image.tar
-          echo "Done! Image loaded successfully."
+          echo "Done!"
           EOF
-          
           chmod +x restore-image.sh
       
-      - name: Create README instructions
+      - name: Create README
         run: |
           cat > README-DOCKER-IMAGE.md << 'EOF'
           # FluffyChat Docker Image Bundle
+          حجم کل حدود 3 گیگابایت در پارت‌های 95 مگابایتی.
           
-          این مخزن شامل فایل Docker image به صورت پارت‌های 95 مگابایتی است.
-          
-          ## حجم کل
-          حدود 3 گیگابایت در 32 پارت
-          
-          ## آموزش بازیابی
-          
-          1. ** clone کردن مخزن **
+          ## بازیابی
           ```bash
-          git clone https://github.com/mm-goli1386/ghcr.git
-          cd ghcr
+          ./restore-image.sh
