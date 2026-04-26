@@ -1,4 +1,4 @@
-name: Download Docker Image to Repository
+name: Download and Split Docker Image
 
 on:
   workflow_dispatch:
@@ -6,33 +6,64 @@ on:
 jobs:
   download:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Pull Docker image
         run: |
           docker pull ghcr.io/m-logique/fluffychat-building-bundle:44233fc3b0ffa2ab0a5bde6178a7c77597143c49
       
-      - name: Save as tar file
+      - name: Save and compress
         run: |
-          docker save ghcr.io/m-logique/fluffychat-building-bundle:44233fc3b0ffa2ab0a5bde6178a7c77597143c49 -o fluffychat-image.tar
+          docker save ghcr.io/m-logique/fluffychat-building-bundle:44233fc3b0ffa2ab0a5bde6178a7c77597143c49 | gzip > fluffychat-image.tar.gz
       
-      - name: Compress
+      - name: Split into 95MB parts
         run: |
-          gzip fluffychat-image.tar
+          # حذف فایل‌های قدیمی اگر وجود دارند
+          rm -f fluffychat-part-* || true
+          
+          # تقسیم فایل به پارت‌های 95 مگابایتی (95 * 1024 * 1024 = 99614720 bytes)
+          split -b 99614720 fluffychat-image.tar.gz fluffychat-part-
+          
+          # شمارش تعداد پارت‌ها
+          PART_COUNT=$(ls fluffychat-part-* | wc -l)
+          echo "PART_COUNT=$PART_COUNT" >> $GITHUB_ENV
+          echo "Created $PART_COUNT parts"
       
-      - name: Upload as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: fluffychat-image
-          path: fluffychat-image.tar.gz
-      
-      - name: Commit to repository
+      - name: Create restore script
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add fluffychat-image.tar.gz
-          git commit -m "Add FluffyChat Docker image" || echo "No changes"
-          git push
+          cat > restore-image.sh << 'EOF'
+          #!/bin/bash
+          echo "Merging parts..."
+          cat fluffychat-part-* > fluffychat-image.tar.gz
+          echo "Extracting..."
+          gunzip fluffychat-image.tar.gz
+          echo "Loading into Docker..."
+          docker load -i fluffychat-image.tar
+          echo "Done! Image loaded successfully."
+          EOF
+          
+          chmod +x restore-image.sh
+      
+      - name: Create README instructions
+        run: |
+          cat > README-DOCKER-IMAGE.md << 'EOF'
+          # FluffyChat Docker Image Bundle
+          
+          این مخزن شامل فایل Docker image به صورت پارت‌های 95 مگابایتی است.
+          
+          ## حجم کل
+          حدود 3 گیگابایت در 32 پارت
+          
+          ## آموزش بازیابی
+          
+          1. ** clone کردن مخزن **
+          ```bash
+          git clone https://github.com/mm-goli1386/ghcr.git
+          cd ghcr
