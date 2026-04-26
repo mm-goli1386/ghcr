@@ -1,7 +1,3 @@
-
-## اگر باز هم کار نکرد، این روش جایگزین را امتحان کنید:
-
-```yaml
 name: Force Push Docker Parts
 
 on:
