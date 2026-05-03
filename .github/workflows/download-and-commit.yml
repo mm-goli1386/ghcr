@@ -1,39 +1,20 @@
-name: Simple Docker Image Upload
+name: Sync Sable Image
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # اجرای دستی
+  schedule:
+    - cron: '0 0 * * 0'  # هفته‌ای یک بار
 
 jobs:
-  upload:
+  sync:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Pull and compress
+      - name: Pull from ghcr.io
         run: |
-          docker pull ghcr.io/m-logique/fluffychat-building-bundle:44233fc3b0ffa2ab0a5bde6178a7c77597143c49
-          docker save ghcr.io/m-logique/fluffychat-building-bundle:44233fc3b0ffa2ab0a5bde6178a7c77597143c49 | gzip > image.tar.gz
-      
-      - name: Split and archive
+          docker pull ghcr.io/sableclient/sable:latest
+          docker tag ghcr.io/sableclient/sable:latest ghcr.io/${{ github.repository }}/sable:latest
+
+      - name: Push to your registry
         run: |
-          split -b 95m image.tar.gz part-
-          tar czf image-parts.tar.gz part-*
-          rm -f image.tar.gz part-*
-      
-      - name: Create restore script
-        run: |
-          printf '#!/bin/bash\ntar xzf image-parts.tar.gz\ncat part-* > image.tar.gz\ngunzip image.tar.gz\ndocker load -i image.tar\nrm -f part-* image.tar\n' > restore.sh
-          chmod +x restore.sh
-      
-      - name: Commit and push
-        run: |
-          git config user.name "GitHub Action"
-          git config user.email "action@github.com"
-          git add image-parts.tar.gz restore.sh
-          git commit -m "Add Docker image bundle" && git push origin main || echo "Push failed or nothing to commit"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker push ghcr.io/${{ github.repository }}/sable:latest
